@@ -1,5 +1,6 @@
 module Sport.Serial
   ( SerialConfig(..)
+  , defSerialConfig
   , withSerial
   , openSerial
   ) where
@@ -18,6 +19,17 @@ data SerialConfig = SerialConfig
   , rtimeout :: Maybe Int
   , excl :: Bool -- ^ exclusive
   } deriving (Eq, Show)
+
+defSerialConfig :: SerialConfig
+defSerialConfig = SerialConfig
+  { path = "/dev/ttyUSB0"
+  , speed = B115200
+  , byteSize = 8
+  , parity = Nothing
+  , stopBits = One
+  , rtimeout = Nothing
+  , excl = True
+  }
 
 data Parity = Even | Odd
   deriving (Eq, Read, Show)
