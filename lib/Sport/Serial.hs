@@ -62,8 +62,8 @@ withConfig attrs cfg =
     `withBits` byteSize cfg
     `withParity` parity cfg
     `withStopBits` stopBits cfg
-    `withMode` StartStopInput
-    `withMode` StartStopOutput
+    `withoutMode` StartStopInput
+    `withoutMode` StartStopOutput
     `withoutMode` EnableEcho
     `withoutMode` EchoErase
     `withoutMode` EchoKill

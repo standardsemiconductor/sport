@@ -11,6 +11,8 @@ sportMain = do
   putStrLn "...UNIX.SERIAL.PORT..."
   withSerial defSerialConfig{speed = B19200} $ \serial -> do
     hSetBuffering serial NoBuffering
+    hSetBuffering stdin  NoBuffering
+    hSetBuffering stdout NoBuffering
     concurrently_ (reading serial) (writing serial)
 
 reading :: Handle -> IO a
