@@ -22,6 +22,8 @@ library
                     Sport.Serial
   build-depends:    async,
                     base < 5,
+                    bytestring,
+                    stm,
                     unix
 
 executable sport
