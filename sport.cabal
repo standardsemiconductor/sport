@@ -19,7 +19,8 @@ library
   hs-source-dirs:   lib
   exposed-modules:  Sport,
                     Sport.Main,
-                    Sport.Serial
+                    Sport.Serial,
+                    Sport.Sport
   build-depends:    async,
                     base < 5,
                     bytestring,
