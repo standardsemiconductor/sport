@@ -3,7 +3,7 @@
 -- @
 -- import Sport
 --
--- main = withSport $ \s -> do
+-- main = withSport $ \\s -> do
 --   openSport s defSerialConfig
 --   bs <- readSport s 64
 --   writeSport s bs
@@ -18,13 +18,15 @@ module Sport
   , -- *** Open & Close
     openSport
   , SerialConfig(..)
+  , Parity(..)
+  , StopBits(..)
   , defSerialConfig
   , closeSport
-  , -- *** Reading & Writing
+  , -- *** Read & Write
     readSport
   , readSomeSport
   , writeSport
-  , -- *** Exceptions
+  , -- *** Exception
     SportException(..)
   ) where
 

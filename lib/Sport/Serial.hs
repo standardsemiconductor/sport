@@ -1,8 +1,10 @@
 module Sport.Serial
-  ( SerialConfig(..)
-  , defSerialConfig
-  , withSerial
+  ( withSerial
   , openSerial
+  , SerialConfig(..)
+  , Parity(..)
+  , StopBits(..)
+  , defSerialConfig
   ) where
 
 import Control.Exception
