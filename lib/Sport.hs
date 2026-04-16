@@ -1,15 +1,32 @@
+-- | UNIX Serial Port
+--
+-- @
+-- import Sport
+--
+-- main = withSport $ \s -> do
+--   openSport s defSerialConfig
+--   bs <- readSport s 64
+--   writeSport s bs
+-- @
 module Sport
-  ( Sport
+  ( -- *** Handle
+    Sport
   , withSport
   , newSport
   , newSportSTM
   , runSport
-  , openSport
+  , -- *** Open & Close
+    openSport
+  , SerialConfig(..)
+  , defSerialConfig
   , closeSport
-  , readSport
+  , -- *** Reading & Writing
+    readSport
   , readSomeSport
   , writeSport
-  , SportException(..)
+  , -- *** Exceptions
+    SportException(..)
   ) where
 
+import Sport.Serial
 import Sport.Sport
