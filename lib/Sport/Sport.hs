@@ -1,7 +1,7 @@
 module Sport.Sport
   ( Sport
+  , newSportIO
   , newSport
-  , newSportSTM
   , withSport
   , runSport
   , openSport
@@ -26,12 +26,12 @@ import System.IO
 data Sport = Sport (TVar State)
 
 -- | Acquire IO serial port
-newSport :: IO Sport
-newSport = atomically newSportSTM
+newSportIO :: IO Sport
+newSportIO = atomically newSport
 
 -- | Acquire STM serial port
-newSportSTM :: STM Sport
-newSportSTM = Sport <$> newTVar Closed
+newSport :: STM Sport
+newSport = Sport <$> newTVar Closed
 
 data State
   = Closed
@@ -132,7 +132,7 @@ writeSport (Sport s) bs = do
 -- | Acquire a serial port and run the daemon.
 withSport :: (Sport -> IO a) -> IO a
 withSport k = do
-  s <- newSport
+  s <- newSportIO
   either id id <$> race (k s) (runSport s)
 
 -- | Run the serial port daemon and process requests.

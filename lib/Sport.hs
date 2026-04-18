@@ -12,8 +12,8 @@ module Sport
   ( -- *** Handle
     Sport
   , withSport
+  , newSportIO
   , newSport
-  , newSportSTM
   , runSport
   , -- *** Open & Close
     openSport
