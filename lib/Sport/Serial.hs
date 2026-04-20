@@ -9,8 +9,7 @@ module Sport.Serial
 
 import Control.Exception
 import System.IO
-import System.Posix.IO
-import System.Posix.Terminal
+import System.Posix
 
 data SerialConfig = SerialConfig
   { path :: FilePath
@@ -40,14 +39,19 @@ data StopBits = One | Two
   deriving (Eq, Read, Show)
 
 withSerial :: SerialConfig -> (Handle -> IO a) -> IO a
-withSerial settings = bracket (openSerial settings) hClose
+withSerial settings k =
+  bracket (openSerialFd settings) closeFd $ \fd ->
+  bracket (fdToHandle fd) hClose k
 
 openSerial :: SerialConfig -> IO Handle
-openSerial cfg = do
+openSerial cfg = fdToHandle =<< openSerialFd cfg
+
+openSerialFd :: SerialConfig -> IO Fd
+openSerialFd cfg = do
   fd <- openFd (path cfg) ReadWrite flags
   attrs <- getTerminalAttributes fd
   setTerminalAttributes fd (attrs `withConfig` cfg) Immediately
-  fdToHandle fd
+  return fd
   where
     flags =
       defaultFileFlags
