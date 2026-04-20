@@ -17,11 +17,9 @@ module Sport
   , runSport
   , -- *** Open & Close
     openSport
-  , defSportConfig
-  , SportConfig(..)
+  , defSportCfg
+  , SportCfg(..)
   , BufferMode(..)
-  , defSerialConfig
-  , SerialConfig(..)
   , Parity(..)
   , StopBits(..)
   , closeSport

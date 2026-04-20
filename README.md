@@ -6,7 +6,7 @@ UNIX Serial Port
 import Sport
 
 main = withSport $ \s -> do
-  openSport s defSerialConfig
+  openSport s defSportCfg{path="/dev/ttyUSB1"}
   bs <- readSport s 64
   writeSport s bs
 ```

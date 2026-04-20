@@ -5,8 +5,8 @@ module Sport.Sport
   , withSport
   , runSport
   , openSport
-  , defSportConfig
-  , SportConfig(..)
+  , defSportCfg
+  , SportCfg(..)
   , closeSport
   , readSport
   , readSomeSport
@@ -23,8 +23,9 @@ import qualified Data.ByteString as Strict
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import Data.Functor
-import Sport.Serial
+import qualified Sport.Serial as Serial
 import System.IO
+import System.Posix
 
 data Sport = Sport
   { state :: TVar State
@@ -46,8 +47,8 @@ newSport =
 
 data State
   = Closed
-  | Opening SportConfig (TMVar (Either SomeException ()))
-  | Open SportConfig Handle
+  | Opening SportCfg (TMVar (Either SomeException ()))
+  | Open SportCfg Handle
   deriving Eq
 
 data RdCmd
@@ -58,20 +59,36 @@ data WrCmd
   = Wr ByteString (TMVar (Either SomeException ()))
 
 -- | Handle and serial configuration
-data SportConfig = SportConfig
-  { binaryMode   :: Bool -- ^ Binary mode True, text mode False.
-  , bufferMode   :: BufferMode
-  , serialConfig :: SerialConfig
+data SportCfg = SportCfg
+  { binaryMode :: Bool -- ^ Binary mode True, text mode False.
+  , bufferMode :: BufferMode
+  , path       :: FilePath
+  , speed      :: BaudRate
+  , byteSize   :: Int -- ^ number of bits per byte
+  , parity     :: Maybe Serial.Parity
+  , stopBits   :: Serial.StopBits
+  , rtimeout   :: Maybe Int
+  , excl       :: Bool -- ^ exclusive
   }
   deriving Eq
 
 -- | Binary with no buffering
-defSportConfig :: SportConfig
-defSportConfig = SportConfig True NoBuffering defSerialConfig
+defSportCfg :: SportCfg
+defSportCfg =
+  SportCfg
+    True
+    NoBuffering
+    (Serial.path Serial.defSerialConfig)
+    (Serial.speed Serial.defSerialConfig)
+    (Serial.byteSize Serial.defSerialConfig)
+    (Serial.parity Serial.defSerialConfig)
+    (Serial.stopBits Serial.defSerialConfig)
+    (Serial.rtimeout Serial.defSerialConfig)
+    (Serial.excl Serial.defSerialConfig)
 
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
-openSport :: Sport -> SportConfig -> IO ()
+openSport :: Sport -> SportCfg -> IO ()
 openSport (Sport s _ _) cfg = do
   res <- newEmptyTMVarIO
   atomically $ do
@@ -201,14 +218,25 @@ writeHandler s serial = forever $ do
 waitNewState :: Sport -> State -> IO ()
 waitNewState s st = atomically $ check . (st /=) =<< readTVar (state s)
 
-opening :: Sport -> SportConfig -> TMVar (Either SomeException ()) -> IO ()
+opening :: Sport -> SportCfg -> TMVar (Either SomeException ()) -> IO ()
 opening s cfg res =
-  bracketOnError (openSerial $ serialConfig cfg) hClose $ \serial -> do
+  bracketOnError (Serial.openSerial $ toSerialConfig cfg) hClose $ \serial -> do
     hSetBinaryMode serial $ binaryMode cfg
     hSetBuffering serial $ bufferMode cfg
     atomically $ do
       writeTVar (state s) $ Open cfg serial
       writeTMVar res $ Right ()
+
+toSerialConfig :: SportCfg -> Serial.SerialConfig
+toSerialConfig s =
+  Serial.SerialConfig
+    (path s)
+    (speed s)
+    (byteSize s)
+    (parity s)
+    (stopBits s)
+    (rtimeout s)
+    (excl s)
 
 handleException :: TMVar (Either SomeException a) -> IO () -> IO ()
 handleException res k = k `catches`
