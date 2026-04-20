@@ -17,10 +17,13 @@ module Sport
   , runSport
   , -- *** Open & Close
     openSport
+  , defSportConfig
+  , SportConfig(..)
+  , BufferMode(..)
+  , defSerialConfig
   , SerialConfig(..)
   , Parity(..)
   , StopBits(..)
-  , defSerialConfig
   , closeSport
   , -- *** Read & Write
     readSport
@@ -32,3 +35,4 @@ module Sport
 
 import Sport.Serial
 import Sport.Sport
+import System.IO

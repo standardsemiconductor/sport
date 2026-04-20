@@ -7,7 +7,6 @@ module Sport.Sport
   , openSport
   , defSportConfig
   , SportConfig(..)
-  , BufferMode(..)
   , closeSport
   , readSport
   , readSomeSport
@@ -45,6 +44,7 @@ data State
   | Wr SportConfig Handle ByteString (TMVar (Either SomeException ()))
   deriving Eq
 
+-- | Handle and serial configuration
 data SportConfig = SportConfig
   { binaryMode   :: Bool -- ^ Binary mode True, text mode False.
   , bufferMode   :: BufferMode
