@@ -4,12 +4,12 @@
 -- import Sport
 --
 -- main = withSport $ \\s -> do
---   openSport s defSportCfg{path="/dev/ttyUSB1", speed=B19200}
+--   openSport s defSportCfg{path="\/dev\/ttyUSB1", speed=B19200}
 --   bs <- readSport s 64
 --   writeSport s bs
 -- @
 module Sport
-  ( -- *** Handle
+  ( -- *** Handle & Daemon
     Sport
   , withSport
   , newSportIO
