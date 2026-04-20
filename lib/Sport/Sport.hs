@@ -41,7 +41,7 @@ data State
   | Opening SportConfig (TMVar (Either SomeException ()))
   | Open SportConfig Handle
   | Rd SportConfig Handle Int (TMVar (Either SomeException ByteString))
-  | RdSome SportConfig Handle Int (TMVar (Either SomeException Strict.ByteString))
+  | RdSome SportConfig Handle Int (TMVar (Either SomeException ByteString))
   | Wr SportConfig Handle ByteString (TMVar (Either SomeException ()))
   deriving Eq
 
@@ -110,7 +110,7 @@ readSport (Sport s) n = do
 -- is closed then throw 'SportClosed'. Block if the serial port
 -- is busy handling a concurrent request or until some of
 -- the n bytes are available.
-readSomeSport :: Sport -> Int -> IO Strict.ByteString
+readSomeSport :: Sport -> Int -> IO ByteString
 readSomeSport (Sport s) n = do
   res <- newEmptyTMVarIO
   atomically $ do
@@ -193,10 +193,10 @@ readingSome
   -> SportConfig
   -> Handle
   -> Int
-  -> TMVar (Either SomeException Strict.ByteString)
+  -> TMVar (Either SomeException ByteString)
   -> IO ()
 readingSome s cfg serial n res = do
-  bs <- Strict.hGetSome serial n
+  bs <- BS.fromStrict <$> Strict.hGetSome serial n
   atomically $ do
     writeTVar s $ Open cfg serial
     writeTMVar res $ Right bs
