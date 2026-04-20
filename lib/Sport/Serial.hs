@@ -39,19 +39,13 @@ data StopBits = One | Two
   deriving (Eq, Read, Show)
 
 withSerial :: SerialConfig -> (Handle -> IO a) -> IO a
-withSerial settings k =
-  bracket (openSerialFd settings) closeFd $ \fd ->
-  bracket (fdToHandle fd) hClose k
+withSerial cfg = bracket (openSerial cfg) hClose
 
 openSerial :: SerialConfig -> IO Handle
-openSerial cfg = fdToHandle =<< openSerialFd cfg
-
-openSerialFd :: SerialConfig -> IO Fd
-openSerialFd cfg = do
-  fd <- openFd (path cfg) ReadWrite flags
-  attrs <- getTerminalAttributes fd
-  setTerminalAttributes fd (attrs `withConfig` cfg) Immediately
-  return fd
+openSerial cfg =
+  bracket (openFd (path cfg) ReadWrite flags) closeFd $ \fd -> do
+    configAttrs fd cfg
+    fdToHandle fd
   where
     flags =
       defaultFileFlags
@@ -60,30 +54,34 @@ openSerialFd cfg = do
         , exclusive = excl cfg
         }
 
-withConfig :: TerminalAttributes -> SerialConfig -> TerminalAttributes
-withConfig attrs cfg =
-  attrs
-    `withInputSpeed` speed cfg
-    `withOutputSpeed` speed cfg
-    `withBits` byteSize cfg
-    `withParity` parity cfg
-    `withStopBits` stopBits cfg
-    `withoutMode` StartStopInput
-    `withoutMode` StartStopOutput
-    `withoutMode` EnableEcho
-    `withoutMode` EchoErase
-    `withoutMode` EchoKill
-    `withoutMode` ProcessInput
-    `withoutMode` ProcessOutput
-    `withoutMode` MapCRtoLF
-    `withoutMode` EchoLF
-    `withoutMode` HangupOnClose
-    `withoutMode` KeyboardInterrupts
-    `withoutMode` ExtendedFunctions
-    `withMode` LocalMode
-    `withMode` ReadEnable
-    `withReadTimeout` rtimeout cfg
-    `withMinInput` 0
+-- | configure FD terminal attributes
+configAttrs :: Fd -> SerialConfig -> IO ()
+configAttrs fd cfg = do
+  attrs <- getTerminalAttributes fd
+  setTerminalAttributes fd (config attrs) Immediately
+  where
+    config attrs = attrs
+      `withInputSpeed` speed cfg
+      `withOutputSpeed` speed cfg
+      `withBits` byteSize cfg
+      `withParity` parity cfg
+      `withStopBits` stopBits cfg
+      `withoutMode` StartStopInput
+      `withoutMode` StartStopOutput
+      `withoutMode` EnableEcho
+      `withoutMode` EchoErase
+      `withoutMode` EchoKill
+      `withoutMode` ProcessInput
+      `withoutMode` ProcessOutput
+      `withoutMode` MapCRtoLF
+      `withoutMode` EchoLF
+      `withoutMode` HangupOnClose
+      `withoutMode` KeyboardInterrupts
+      `withoutMode` ExtendedFunctions
+      `withMode` LocalMode
+      `withMode` ReadEnable
+      `withReadTimeout` rtimeout cfg
+      `withMinInput` 0
 
 withParity :: TerminalAttributes -> Maybe Parity -> TerminalAttributes
 withParity attrs Nothing  = attrs `withoutMode` EnableParity
