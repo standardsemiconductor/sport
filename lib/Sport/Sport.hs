@@ -5,6 +5,9 @@ module Sport.Sport
   , withSport
   , runSport
   , openSport
+  , defSportConfig
+  , SportConfig(..)
+  , BufferMode(..)
   , closeSport
   , readSport
   , readSomeSport
@@ -23,7 +26,7 @@ import Data.Functor
 import Sport.Serial
 import System.IO
 
-data Sport = Sport (TVar State)
+newtype Sport = Sport (TVar State)
 
 -- | Acquire IO serial port
 newSportIO :: IO Sport
@@ -35,16 +38,27 @@ newSport = Sport <$> newTVar Closed
 
 data State
   = Closed
-  | Opening SerialConfig (TMVar (Either SomeException ()))
-  | Open SerialConfig Handle
-  | Rd SerialConfig Handle Int (TMVar (Either SomeException ByteString))
-  | RdSome SerialConfig Handle Int (TMVar (Either SomeException Strict.ByteString))
-  | Wr SerialConfig Handle ByteString (TMVar (Either SomeException ()))
+  | Opening SportConfig (TMVar (Either SomeException ()))
+  | Open SportConfig Handle
+  | Rd SportConfig Handle Int (TMVar (Either SomeException ByteString))
+  | RdSome SportConfig Handle Int (TMVar (Either SomeException Strict.ByteString))
+  | Wr SportConfig Handle ByteString (TMVar (Either SomeException ()))
   deriving Eq
+
+data SportConfig = SportConfig
+  { binaryMode   :: Bool -- ^ Binary mode True, text mode False.
+  , bufferMode   :: BufferMode
+  , serialConfig :: SerialConfig
+  }
+  deriving Eq
+
+-- | Binary with no buffering
+defSportConfig :: SportConfig
+defSportConfig = SportConfig True NoBuffering defSerialConfig
 
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
-openSport :: Sport -> SerialConfig -> IO ()
+openSport :: Sport -> SportConfig -> IO ()
 openSport (Sport s) cfg = do
   res <- newEmptyTMVarIO
   atomically $ do
@@ -152,16 +166,18 @@ runState s st = case st of
 waitNewState :: TVar State -> State -> IO ()
 waitNewState s st = atomically $ check . (st /=) =<< readTVar s
 
-opening :: TVar State -> SerialConfig -> TMVar (Either SomeException ()) -> IO ()
+opening :: TVar State -> SportConfig -> TMVar (Either SomeException ()) -> IO ()
 opening s cfg res =
-  bracketOnError (openSerial cfg) hClose $ \serial ->
-  atomically $ do
-    writeTVar s $ Open cfg serial
-    writeTMVar res $ Right ()
+  bracketOnError (openSerial $ serialConfig cfg) hClose $ \serial -> do
+    hSetBinaryMode serial $ binaryMode cfg
+    hSetBuffering serial $ bufferMode cfg
+    atomically $ do
+      writeTVar s $ Open cfg serial
+      writeTMVar res $ Right ()
 
 reading
   :: TVar State
-  -> SerialConfig
+  -> SportConfig
   -> Handle
   -> Int
   -> TMVar (Either SomeException ByteString)
@@ -174,7 +190,7 @@ reading s cfg serial n res = do
 
 readingSome
   :: TVar State
-  -> SerialConfig
+  -> SportConfig
   -> Handle
   -> Int
   -> TMVar (Either SomeException Strict.ByteString)
@@ -187,7 +203,7 @@ readingSome s cfg serial n res = do
 
 writing
   :: TVar State
-  -> SerialConfig
+  -> SportConfig
   -> Handle
   -> ByteString
   -> TMVar (Either SomeException ())
