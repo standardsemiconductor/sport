@@ -17,6 +17,7 @@ module Sport
   , runSport
   , -- *** Open & Close
     openSport
+  , getSportCfg
   , defSportCfg
   , SportCfg(..)
   , BufferMode(..)

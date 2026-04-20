@@ -5,6 +5,7 @@ module Sport.Sport
   , withSport
   , runSport
   , openSport
+  , getSportCfg
   , defSportCfg
   , SportCfg(..)
   , closeSport
@@ -101,6 +102,15 @@ openSport (Sport s _ _) cfg = do
     case result of
       Left err -> throwSTM err
       Right () -> return ()
+
+-- | Get current configuration.
+getSportCfg :: Sport -> STM (Maybe SportCfg)
+getSportCfg (Sport s _ _) = do
+  st <- readTVar s
+  return $ case st of
+    Closed        -> Nothing
+    Opening cfg _ -> Just cfg
+    Open    cfg _ -> Just cfg
 
 -- | Close the serial port.
 closeSport :: Sport -> IO ()
