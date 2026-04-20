@@ -23,7 +23,7 @@ import qualified Data.ByteString as Strict
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import Data.Functor
-import qualified Sport.Serial as Serial
+import qualified Sport.Serial as S
 import System.IO
 import System.Posix
 
@@ -65,8 +65,8 @@ data SportCfg = SportCfg
   , path       :: FilePath
   , speed      :: BaudRate
   , byteSize   :: Int -- ^ number of bits per byte
-  , parity     :: Maybe Serial.Parity
-  , stopBits   :: Serial.StopBits
+  , parity     :: Maybe S.Parity
+  , stopBits   :: S.StopBits
   , rtimeout   :: Maybe Int
   , excl       :: Bool -- ^ exclusive
   }
@@ -78,13 +78,13 @@ defSportCfg =
   SportCfg
     True
     NoBuffering
-    (Serial.path Serial.defSerialCfg)
-    (Serial.speed Serial.defSerialCfg)
-    (Serial.byteSize Serial.defSerialCfg)
-    (Serial.parity Serial.defSerialCfg)
-    (Serial.stopBits Serial.defSerialCfg)
-    (Serial.rtimeout Serial.defSerialCfg)
-    (Serial.excl Serial.defSerialCfg)
+    (S.path S.defSerialCfg)
+    (S.speed S.defSerialCfg)
+    (S.byteSize S.defSerialCfg)
+    (S.parity S.defSerialCfg)
+    (S.stopBits S.defSerialCfg)
+    (S.rtimeout S.defSerialCfg)
+    (S.excl S.defSerialCfg)
 
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
@@ -220,16 +220,16 @@ waitNewState s st = atomically $ check . (st /=) =<< readTVar (state s)
 
 opening :: Sport -> SportCfg -> TMVar (Either SomeException ()) -> IO ()
 opening s cfg res =
-  bracketOnError (Serial.openSerial $ toSerialCfg cfg) hClose $ \serial -> do
+  bracketOnError (S.openSerial $ toSerialCfg cfg) hClose $ \serial -> do
     hSetBinaryMode serial $ binaryMode cfg
     hSetBuffering serial $ bufferMode cfg
     atomically $ do
       writeTVar (state s) $ Open cfg serial
       writeTMVar res $ Right ()
 
-toSerialCfg :: SportCfg -> Serial.SerialCfg
+toSerialCfg :: SportCfg -> S.SerialCfg
 toSerialCfg s =
-  Serial.SerialCfg
+  S.SerialCfg
     (path s)
     (speed s)
     (byteSize s)
