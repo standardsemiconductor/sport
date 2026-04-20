@@ -20,6 +20,7 @@ module Sport
   , defSportCfg
   , SportCfg(..)
   , BufferMode(..)
+  , BaudRate(..)
   , Parity(..)
   , StopBits(..)
   , closeSport
@@ -34,3 +35,4 @@ module Sport
 import Sport.Serial
 import Sport.Sport
 import System.IO
+import System.Posix
