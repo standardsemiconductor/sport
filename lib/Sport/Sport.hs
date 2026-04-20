@@ -14,6 +14,7 @@ module Sport.Sport
   , SportException(..)
   ) where
 
+import Control.Applicative
 import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Exception
@@ -25,7 +26,11 @@ import Data.Functor
 import Sport.Serial
 import System.IO
 
-newtype Sport = Sport (TVar State)
+data Sport = Sport
+  { state :: TVar State
+  , rcmd  :: TMVar RdCmd
+  , wcmd  :: TMVar WrCmd
+  }
 
 -- | Acquire IO serial port
 newSportIO :: IO Sport
@@ -33,16 +38,24 @@ newSportIO = atomically newSport
 
 -- | Acquire STM serial port
 newSport :: STM Sport
-newSport = Sport <$> newTVar Closed
+newSport =
+  Sport
+    <$> newTVar Closed
+    <*> newEmptyTMVar
+    <*> newEmptyTMVar
 
 data State
   = Closed
   | Opening SportConfig (TMVar (Either SomeException ()))
   | Open SportConfig Handle
-  | Rd SportConfig Handle Int (TMVar (Either SomeException ByteString))
-  | RdSome SportConfig Handle Int (TMVar (Either SomeException ByteString))
-  | Wr SportConfig Handle ByteString (TMVar (Either SomeException ()))
   deriving Eq
+
+data RdCmd
+  = Rd Int (TMVar (Either SomeException ByteString))
+  | RdSome Int (TMVar (Either SomeException ByteString))
+
+data WrCmd
+  = Wr ByteString (TMVar (Either SomeException ()))
 
 -- | Handle and serial configuration
 data SportConfig = SportConfig
@@ -59,7 +72,7 @@ defSportConfig = SportConfig True NoBuffering defSerialConfig
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
 openSport :: Sport -> SportConfig -> IO ()
-openSport (Sport s) cfg = do
+openSport (Sport s _ _) cfg = do
   res <- newEmptyTMVarIO
   atomically $ do
     st <- readTVar s
@@ -74,16 +87,18 @@ openSport (Sport s) cfg = do
 
 -- | Close the serial port.
 closeSport :: Sport -> IO ()
-closeSport (Sport s) = join $ atomically $ do
+closeSport (Sport s r w) = join $ atomically $ do
   st <- readTVar s
   writeTVar s Closed
+  (rM, wM) <- (,) <$> tryTakeTMVar r <*> tryTakeTMVar w
+  forM_ rM $ \cmd -> case cmd of
+    Rd     _ res -> closeResponse res
+    RdSome _ res -> closeResponse res
+  forM_ wM $ \(Wr _ res) -> closeResponse res
   case st of
-    Closed                 -> return $ return ()
-    Opening _          res -> closeResponse res $> return ()
-    Open    _ serial       -> return $ hClose serial
-    Rd      _ serial _ res -> closeResponse res $> hClose serial
-    RdSome  _ serial _ res -> closeResponse res $> hClose serial
-    Wr      _ serial _ res -> closeResponse res $> hClose serial
+    Closed        -> return $ return ()
+    Opening _ res -> closeResponse res $> return ()
+    Open _ serial -> return $ hClose serial
 
 closeResponse :: TMVar (Either SomeException a) -> STM ()
 closeResponse res = void $ tryPutTMVar res $ Left $ toException SportClosed
@@ -92,14 +107,14 @@ closeResponse res = void $ tryPutTMVar res $ Left $ toException SportClosed
 -- closed then throw 'SportClosed'. Block if the serial port is
 -- busy handling a concurrent request or until all n bytes are available.
 readSport :: Sport -> Int -> IO ByteString
-readSport (Sport s) n = do
+readSport (Sport s r _) n = do
   res <- newEmptyTMVarIO
   atomically $ do
     st <- readTVar s
     case st of
-      Closed          -> throwSTM SportClosed
-      Open cfg serial -> writeTVar s $ Rd cfg serial n res
-      _               -> retry
+      Closed -> throwSTM SportClosed
+      Open{} -> putTMVar r $ Rd n res
+      _      -> retry
   atomically $ do
     result <- takeTMVar res
     case result of
@@ -111,14 +126,14 @@ readSport (Sport s) n = do
 -- is busy handling a concurrent request or until some of
 -- the n bytes are available.
 readSomeSport :: Sport -> Int -> IO ByteString
-readSomeSport (Sport s) n = do
+readSomeSport (Sport s r _) n = do
   res <- newEmptyTMVarIO
   atomically $ do
     st <- readTVar s
     case st of
-      Closed          -> throwSTM SportClosed
-      Open cfg serial -> writeTVar s $ RdSome cfg serial n res
-      _               -> retry
+      Closed -> throwSTM SportClosed
+      Open{} -> putTMVar r $ RdSome n res
+      _      -> retry
   atomically $ do
     result <- takeTMVar res
     case result of
@@ -129,14 +144,14 @@ readSomeSport (Sport s) n = do
 -- is closed then throw 'SportClosed'. Block if the serial
 -- port is busy handling a concurrent request.
 writeSport :: Sport -> ByteString -> IO ()
-writeSport (Sport s) bs = do
+writeSport (Sport s _ w) bs = do
   res <- newEmptyTMVarIO
   atomically $ do
     st <- readTVar s
     case st of
-      Closed          -> throwSTM SportClosed
-      Open cfg serial -> writeTVar s $ Wr cfg serial bs res
-      _               -> retry
+      Closed -> throwSTM SportClosed
+      Open{} -> putTMVar w $ Wr bs res
+      _      -> retry
   atomically $ do
     result <- takeTMVar res
     case result of
@@ -151,68 +166,49 @@ withSport k = do
 
 -- | Run the serial port daemon and process requests.
 runSport :: Sport -> IO a
-runSport sp@(Sport s) =
-  forever (runState s =<< readTVarIO s) `onException` closeSport sp
+runSport s =
+  forever (runState s =<< readTVarIO (state s)) `onException` closeSport s
 
-runState :: TVar State -> State -> IO ()
+runState :: Sport -> State -> IO ()
 runState s st = case st of
-  Closed                    -> waitNewState s st
-  Opening cfg           res -> handleException res $ opening s cfg res
-  Open{}                    -> waitNewState s st
-  Rd      cfg serial n  res -> handleException res $ reading s cfg serial n res
-  RdSome  cfg serial n  res -> handleException res $ readingSome s cfg serial n res
-  Wr      cfg serial bs res -> handleException res $ writing s cfg serial bs res
+  Closed          -> waitNewState s st
+  Opening cfg res -> handleException res $ opening s cfg res
+  Open _ serial   -> runConcurrently $ asum $ map Concurrently
+    [ waitNewState s st
+    , readHandler s serial
+    , writeHandler s serial
+    ]
 
-waitNewState :: TVar State -> State -> IO ()
-waitNewState s st = atomically $ check . (st /=) =<< readTVar s
+readHandler :: Sport -> Handle -> IO a
+readHandler s serial = forever $ do
+  cmd <- atomically $ takeTMVar $ rcmd s
+  case cmd of
+    Rd n res -> handleException res $ do
+      bs <- BS.hGet serial n
+      atomically $ writeTMVar res $ Right bs
+    RdSome n res -> handleException res $ do
+      bs <- BS.fromStrict <$> Strict.hGetSome serial n
+      atomically $ writeTMVar res $ Right bs
 
-opening :: TVar State -> SportConfig -> TMVar (Either SomeException ()) -> IO ()
+writeHandler :: Sport -> Handle -> IO a
+writeHandler s serial = forever $ do
+  cmd <- atomically $ takeTMVar $ wcmd s
+  case cmd of
+    Wr bs res -> handleException res $ do
+      BS.hPut serial bs
+      atomically $ writeTMVar res $ Right ()
+
+waitNewState :: Sport -> State -> IO ()
+waitNewState s st = atomically $ check . (st /=) =<< readTVar (state s)
+
+opening :: Sport -> SportConfig -> TMVar (Either SomeException ()) -> IO ()
 opening s cfg res =
   bracketOnError (openSerial $ serialConfig cfg) hClose $ \serial -> do
     hSetBinaryMode serial $ binaryMode cfg
     hSetBuffering serial $ bufferMode cfg
     atomically $ do
-      writeTVar s $ Open cfg serial
+      writeTVar (state s) $ Open cfg serial
       writeTMVar res $ Right ()
-
-reading
-  :: TVar State
-  -> SportConfig
-  -> Handle
-  -> Int
-  -> TMVar (Either SomeException ByteString)
-  -> IO ()
-reading s cfg serial n res = do
-  bs <- BS.hGet serial n
-  atomically $ do
-    writeTVar s $ Open cfg serial
-    writeTMVar res $ Right bs
-
-readingSome
-  :: TVar State
-  -> SportConfig
-  -> Handle
-  -> Int
-  -> TMVar (Either SomeException ByteString)
-  -> IO ()
-readingSome s cfg serial n res = do
-  bs <- BS.fromStrict <$> Strict.hGetSome serial n
-  atomically $ do
-    writeTVar s $ Open cfg serial
-    writeTMVar res $ Right bs
-
-writing
-  :: TVar State
-  -> SportConfig
-  -> Handle
-  -> ByteString
-  -> TMVar (Either SomeException ())
-  -> IO ()
-writing s cfg serial bs res = do
-  BS.hPut serial bs
-  atomically $ do
-    writeTVar s $ Open cfg serial
-    writeTMVar res $ Right ()
 
 handleException :: TMVar (Either SomeException a) -> IO () -> IO ()
 handleException res k = k `catches`
