@@ -1,17 +1,17 @@
 module Sport.Serial
   ( withSerial
   , openSerial
-  , SerialConfig(..)
+  , SerialCfg(..)
   , Parity(..)
   , StopBits(..)
-  , defSerialConfig
+  , defSerialCfg
   ) where
 
 import Control.Exception
 import System.IO
 import System.Posix
 
-data SerialConfig = SerialConfig
+data SerialCfg = SerialCfg
   { path :: FilePath
   , speed :: BaudRate
   , byteSize :: Int -- ^ number of bits per byte
@@ -21,8 +21,8 @@ data SerialConfig = SerialConfig
   , excl :: Bool -- ^ exclusive
   } deriving (Eq, Show)
 
-defSerialConfig :: SerialConfig
-defSerialConfig = SerialConfig
+defSerialCfg :: SerialCfg
+defSerialCfg = SerialCfg
   { path = "/dev/ttyUSB0"
   , speed = B115200
   , byteSize = 8
@@ -38,10 +38,10 @@ data Parity = Even | Odd
 data StopBits = One | Two
   deriving (Eq, Read, Show)
 
-withSerial :: SerialConfig -> (Handle -> IO a) -> IO a
+withSerial :: SerialCfg -> (Handle -> IO a) -> IO a
 withSerial cfg = bracket (openSerial cfg) hClose
 
-openSerial :: SerialConfig -> IO Handle
+openSerial :: SerialCfg -> IO Handle
 openSerial cfg =
   bracketOnError (openFd (path cfg) ReadWrite flags) closeFd $ \fd -> do
     configAttrs fd cfg
@@ -55,7 +55,7 @@ openSerial cfg =
         }
 
 -- | configure FD terminal attributes
-configAttrs :: Fd -> SerialConfig -> IO ()
+configAttrs :: Fd -> SerialCfg -> IO ()
 configAttrs fd cfg = do
   attrs <- getTerminalAttributes fd
   setTerminalAttributes fd (config attrs) Immediately

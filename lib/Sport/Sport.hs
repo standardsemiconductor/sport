@@ -78,13 +78,13 @@ defSportCfg =
   SportCfg
     True
     NoBuffering
-    (Serial.path Serial.defSerialConfig)
-    (Serial.speed Serial.defSerialConfig)
-    (Serial.byteSize Serial.defSerialConfig)
-    (Serial.parity Serial.defSerialConfig)
-    (Serial.stopBits Serial.defSerialConfig)
-    (Serial.rtimeout Serial.defSerialConfig)
-    (Serial.excl Serial.defSerialConfig)
+    (Serial.path Serial.defSerialCfg)
+    (Serial.speed Serial.defSerialCfg)
+    (Serial.byteSize Serial.defSerialCfg)
+    (Serial.parity Serial.defSerialCfg)
+    (Serial.stopBits Serial.defSerialCfg)
+    (Serial.rtimeout Serial.defSerialCfg)
+    (Serial.excl Serial.defSerialCfg)
 
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
@@ -220,16 +220,16 @@ waitNewState s st = atomically $ check . (st /=) =<< readTVar (state s)
 
 opening :: Sport -> SportCfg -> TMVar (Either SomeException ()) -> IO ()
 opening s cfg res =
-  bracketOnError (Serial.openSerial $ toSerialConfig cfg) hClose $ \serial -> do
+  bracketOnError (Serial.openSerial $ toSerialCfg cfg) hClose $ \serial -> do
     hSetBinaryMode serial $ binaryMode cfg
     hSetBuffering serial $ bufferMode cfg
     atomically $ do
       writeTVar (state s) $ Open cfg serial
       writeTMVar res $ Right ()
 
-toSerialConfig :: SportCfg -> Serial.SerialConfig
-toSerialConfig s =
-  Serial.SerialConfig
+toSerialCfg :: SportCfg -> Serial.SerialCfg
+toSerialCfg s =
+  Serial.SerialCfg
     (path s)
     (speed s)
     (byteSize s)
