@@ -3,7 +3,6 @@ module Sport.Main (sportMain) where
 import Control.Concurrent.Async
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Sport.Serial
 import Sport.Sport
 import System.IO
 import System.Posix
@@ -14,7 +13,7 @@ sportMain =
     putStrLn "...UNIX.SERIAL.PORT..."
     hSetBuffering stdin  NoBuffering
     hSetBuffering stdout NoBuffering
-    openSport s defSportConfig{serialConfig = defSerialConfig{speed = B19200}}
+    openSport s defSportCfg{speed = B19200}
     concurrently_ (reading s) (writing s)
 
 reading :: Sport -> IO a
