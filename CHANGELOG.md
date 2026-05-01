@@ -1,5 +1,11 @@
 # Revision history for sport
 
+## 1.0.0.0 -- 4-30-2026
+
+* Fix `SportAlreadyOpen` bug
+* Update exception types
+* Add `isOpenSport` to STM API
+
 ## 0.2.0.0 -- 4-21-2026
 
 * Expose current configuration in STM
