@@ -5,6 +5,7 @@ module Sport.Sport
   , withSport
   , runSport
   , openSport
+  , isOpenSport
   , getSportCfg
   , defSportCfg
   , SportCfg(..)
@@ -52,6 +53,14 @@ data State
   | Open SportCfg Handle
   deriving Eq
 
+isOpen :: State -> Bool
+isOpen Open{} = True
+isOpen _      = False
+
+-- | Check if serial port is open
+isOpenSport :: Sport -> STM Bool
+isOpenSport = fmap isOpen . readTVar . state
+
 data RdCmd
   = Rd Int (TMVar (Either SomeException ByteString))
   | RdSome Int (TMVar (Either SomeException ByteString))
@@ -71,7 +80,7 @@ data SportCfg = SportCfg
   , rtimeout   :: Maybe Int
   , excl       :: Bool -- ^ exclusive
   }
-  deriving Eq
+  deriving (Eq, Show)
 
 -- | Binary with no buffering
 defSportCfg :: SportCfg
@@ -90,13 +99,14 @@ defSportCfg =
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
 openSport :: Sport -> SportCfg -> IO ()
-openSport (Sport s _ _) cfg = do
+openSport (Sport s _ _) cfg' = do
   res <- newEmptyTMVarIO
   atomically $ do
     st <- readTVar s
     case st of
-      Closed -> writeTVar s $ Opening cfg res
-      _      -> throwSTM SportAlreadyOpen
+      Closed        -> writeTVar s $ Opening cfg' res
+      Opening cfg _ -> throwSTM $ SportAlreadyOpen $ path cfg
+      Open    cfg _ -> throwSTM $ SportAlreadyOpen $ path cfg
   atomically $ do
     result <- takeTMVar res
     case result of
@@ -198,9 +208,12 @@ runSport s =
 
 runState :: Sport -> State -> IO ()
 runState s st = case st of
-  Closed          -> waitNewState s st
-  Opening cfg res -> handleException res $ opening s cfg res
-  Open _ serial   -> runConcurrently $ asum $ map Concurrently
+  Closed -> waitNewState s st
+  Opening cfg res ->
+    handleException res $
+      opening s cfg res
+        `onException` atomically (writeTVar (state s) Closed)
+  Open _ serial -> runConcurrently $ asum $ map Concurrently
     [ waitNewState s st
     , readHandler s serial
     , writeHandler s serial
@@ -259,7 +272,12 @@ data SportException
     -- | User required an open sport but it was closed.
   = SportClosed
     -- | User attempted to open a serial port that was already open.
-  | SportAlreadyOpen
-  deriving (Eq, Read, Show)
+  | SportAlreadyOpen String
+  deriving Eq
+
+instance Show SportException where
+  show e = "sport exception: " <> case e of
+    SportClosed -> "serial port closed"
+    SportAlreadyOpen p -> "serial port already open: " <> p
 
 instance Exception SportException
