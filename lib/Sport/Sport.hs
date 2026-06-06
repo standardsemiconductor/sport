@@ -7,6 +7,7 @@ module Sport.Sport
   , openSport
   , isOpenSport
   , getSportCfg
+  , getOpenSportCfg
   , defSportCfg
   , SportCfg(..)
   , closeSport
@@ -113,7 +114,8 @@ openSport (Sport s _ _) cfg' = do
       Left err -> throwSTM err
       Right () -> return ()
 
--- | Get current configuration.
+-- | Get current configuration. Returns 'Just' if
+-- the current state is opening or open. See also 'getOpenSportCfg'.
 getSportCfg :: Sport -> STM (Maybe SportCfg)
 getSportCfg (Sport s _ _) = do
   st <- readTVar s
@@ -122,20 +124,37 @@ getSportCfg (Sport s _ _) = do
     Opening cfg _ -> Just cfg
     Open    cfg _ -> Just cfg
 
+-- | Get current open configuration. Returns 'Just' if
+-- the current state is open. See also 'getSportCfg'.
+getOpenSportCfg :: Sport -> STM (Maybe SportCfg)
+getOpenSportCfg (Sport s _ _) = do
+  st <- readTVar s
+  return $ case st of
+    Closed     -> Nothing
+    Opening{}  -> Nothing
+    Open cfg _ -> Just cfg
+
 -- | Close the serial port.
 closeSport :: Sport -> IO ()
 closeSport (Sport s r w) = join $ atomically $ do
   st <- readTVar s
   writeTVar s Closed
   (rM, wM) <- (,) <$> tryTakeTMVar r <*> tryTakeTMVar w
-  forM_ rM $ \cmd -> case cmd of
-    Rd     _ res -> closeResponse res
-    RdSome _ res -> closeResponse res
-  forM_ wM $ \(Wr _ res) -> closeResponse res
-  case st of
-    Closed        -> return $ return ()
-    Opening _ res -> closeResponse res $> return ()
-    Open _ serial -> return $ hClose serial
+  mapM_ closeRdCmd rM
+  mapM_ closeWrCmd wM
+  closeState st
+
+closeRdCmd :: RdCmd -> STM ()
+closeRdCmd (Rd     _ res) = closeResponse res
+closeRdCmd (RdSome _ res) = closeResponse res
+
+closeWrCmd :: WrCmd -> STM ()
+closeWrCmd (Wr _ res) = closeResponse res
+
+closeState :: State -> STM (IO ())
+closeState Closed          = return $ return ()
+closeState (Opening _ res) = closeResponse res $> return ()
+closeState (Open _ serial) = return $ hClose serial
 
 closeResponse :: TMVar (Either SomeException a) -> STM ()
 closeResponse res = void $ tryPutTMVar res $ Left $ toException SportClosed
