@@ -1,3 +1,4 @@
+-- | Low-level serial IO
 module Sport.Serial
   ( withSerial
   , openSerial
@@ -11,6 +12,7 @@ import Control.Exception
 import System.IO
 import System.Posix
 
+-- | Configuration
 data SerialCfg = SerialCfg
   { path :: FilePath
   , speed :: BaudRate
@@ -21,6 +23,7 @@ data SerialCfg = SerialCfg
   , excl :: Bool -- ^ exclusive
   } deriving (Eq, Show)
 
+-- | Default configuration
 defSerialCfg :: SerialCfg
 defSerialCfg = SerialCfg
   { path = "/dev/ttyUSB0"
@@ -38,9 +41,11 @@ data Parity = Even | Odd
 data StopBits = One | Two
   deriving (Eq, Read, Show)
 
+-- | Acquire bracketed serial handle
 withSerial :: SerialCfg -> (Handle -> IO a) -> IO a
 withSerial cfg = bracket (openSerial cfg) hClose
 
+-- | Open serial sport handle
 openSerial :: SerialCfg -> IO Handle
 openSerial cfg =
   bracketOnError (openFd (path cfg) ReadWrite flags) closeFd $ \fd -> do
