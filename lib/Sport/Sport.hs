@@ -1,8 +1,10 @@
 -- | Internal high-level serial port
 module Sport.Sport
   ( Sport
+  , withNewSport
   , newSportIO
   , newSport
+  , withSport
   , openSport
   , isOpenSport
   , getSportCfg
@@ -72,6 +74,17 @@ defSportCfg =
     (S.stopBits S.defSerialCfg)
     (S.rtimeout S.defSerialCfg)
     (S.excl S.defSerialCfg)
+
+-- | Acquire new handle 'newSportIO' then bracket
+-- 'openSport' with a configuration to 'closeSport'.
+withNewSport :: SportCfg -> (Sport -> IO a) -> IO a
+withNewSport cfg k = do
+  s <- newSportIO
+  withSport s cfg $ k s
+
+-- | Bracket 'openSport' and 'closeSport'.
+withSport :: Sport -> SportCfg -> IO a -> IO a
+withSport s cfg = bracket_ (openSport s cfg) (closeSport s)
 
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.

@@ -12,10 +12,12 @@
 module Sport
   ( -- *** Handle
     Sport
+  , withNewSport
   , newSportIO
   , newSport
   , -- *** Open & Close
-    openSport
+    withSport
+  , openSport
   , isOpenSport
   , getSportCfg
   , defSportCfg
