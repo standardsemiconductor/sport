@@ -7,6 +7,7 @@ import Sport.Sport
 import System.IO
 import System.Posix
 
+-- | Main executable
 sportMain :: IO ()
 sportMain = do
   s <- newSportIO

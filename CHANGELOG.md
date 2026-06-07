@@ -1,5 +1,10 @@
 # Revision history for sport
 
+## 3.0.0.0 -- 6-7-2026
+
+* Update `withSport`, add `withNewSport`
+* Remove `runSport` daemon
+
 ## 2.0.0.0 -- 6-6-2026
 
 * Add `flushSport`, `withOpenSport`
