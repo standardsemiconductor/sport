@@ -48,5 +48,4 @@ test-suite test
   build-depends:    async,
                     base,
                     bytestring,
-                    sport,
-                    stm
+                    sport

@@ -1,7 +1,6 @@
 module Main (main) where
 
 import Control.Concurrent.Async
-import Control.Concurrent.STM
 import qualified Data.ByteString.Lazy as BS
 import Sport
 import System.IO
