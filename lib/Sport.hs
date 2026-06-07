@@ -33,6 +33,7 @@ module Sport
   , writeSport
   , -- *** Exception
     SportException(..)
+  , displaySportException
   ) where
 
 import Sport.Serial
