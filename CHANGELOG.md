@@ -1,5 +1,12 @@
 # Revision history for sport
 
+## 2.0.0.0 -- 6-6-2026
+
+* Add `flushSport`, `withOpenSport`
+* Add `displaySportException`, `SportException` instances
+* Improve concurrency and resource handling
+* Add `getOpenSportCfg`
+
 ## 1.0.0.0 -- 4-30-2026
 
 * Fix `SportAlreadyOpen` bug

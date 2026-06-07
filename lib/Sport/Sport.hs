@@ -21,7 +21,6 @@ module Sport.Sport
   , displaySportException
   ) where
 
-import Control.Applicative
 import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Exception
@@ -61,7 +60,7 @@ readHandle (Sport s) = do
     Open _ h  -> return h
 
 tryReadHandle :: Sport -> STM (Maybe Handle)
-tryReadHandle s = Just `fmap` readHandle s <|> pure Nothing
+tryReadHandle s = Just `fmap` readHandle s `orElse` pure Nothing
 
 -- | Check if serial port is open
 isOpenSport :: Sport -> STM Bool
@@ -151,7 +150,7 @@ closeResponse res = void $ tryPutTMVar res $ Left $ toException SportClosed
 -- are available.
 readSport :: Sport -> Int -> IO ByteString
 readSport s n = do
-  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  h <- atomically $ readHandle s `orElse` throwSTM SportClosed
   BS.hGet h n
 
 -- | Read up to n bytes from the serial port. If the serial port
@@ -159,7 +158,7 @@ readSport s n = do
 -- the n bytes are available.
 readSomeSport :: Sport -> Int -> IO ByteString
 readSomeSport s n = do
-  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  h <- atomically $ readHandle s `orElse` throwSTM SportClosed
   BS.fromStrict <$> Strict.hGetSome h n
 
 -- | Write bytes to the serial port. If the serial port
@@ -167,7 +166,7 @@ readSomeSport s n = do
 -- port is busy handling a concurrent request.
 writeSport :: Sport -> ByteString -> IO ()
 writeSport s bs = do
-  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  h <- atomically $ readHandle s `orElse` throwSTM SportClosed
   BS.hPut h bs
 
 -- | Flush the serial handle. Do nothing if closed.
