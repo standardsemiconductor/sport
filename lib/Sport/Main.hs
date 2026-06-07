@@ -8,13 +8,13 @@ import System.IO
 import System.Posix
 
 sportMain :: IO ()
-sportMain =
-  withSport $ \s -> do
-    putStrLn "...UNIX.SERIAL.PORT..."
-    hSetBuffering stdin  NoBuffering
-    hSetBuffering stdout NoBuffering
-    openSport s defSportCfg{speed = B19200}
-    concurrently_ (reading s) (writing s)
+sportMain = do
+  s <- newSportIO
+  putStrLn "...UNIX.SERIAL.PORT..."
+  hSetBuffering stdin  NoBuffering
+  hSetBuffering stdout NoBuffering
+  openSport s defSportCfg{speed = B19200}
+  concurrently_ (reading s) (writing s)
 
 reading :: Sport -> IO a
 reading s = forever $ putChar . BS.head =<< readSport s 1

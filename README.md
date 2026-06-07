@@ -5,7 +5,8 @@ UNIX Serial Port
 ```hs
 import Sport
 
-main = withSport $ \s -> do
+main = do
+  s <- newSportIO
   openSport s defSportCfg{path="/dev/ttyUSB1"}
   bs <- readSport s 64
   writeSport s bs

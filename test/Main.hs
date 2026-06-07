@@ -10,16 +10,15 @@ main = do
   hSetBuffering stdout NoBuffering
   putStrLn "SPORT TEST"
   s <- newSportIO
-  race_ (runSport s) $ do
-    putStr "OPENING..."
-    openSport s defSportCfg{speed=B19200}
-    putStrLn "DONE"
-    let bs = BS.replicate 256 0xDC
-    putStr "XFERING..."
-    bs' <- fst <$> concurrently (readSport s 10) (writeSport s bs)
-    putStrLn "DONE"
-    putStr "COMPARING..."
-    putStrLn $ if BS.take 10 bs == bs' then "PASS" else "FAIL"
-    putStr "CLOSING..."
-    closeSport s
-    putStrLn "DONE"
+  putStr "OPENING..."
+  openSport s defSportCfg{speed=B19200}
+  putStrLn "DONE"
+  let bs = BS.replicate 256 0xDC
+  putStr "XFERING..."
+  bs' <- fst <$> concurrently (readSport s 10) (writeSport s bs)
+  putStrLn "DONE"
+  putStr "COMPARING..."
+  putStrLn $ if BS.take 10 bs == bs' then "PASS" else "FAIL"
+  putStr "CLOSING..."
+  closeSport s
+  putStrLn "DONE"

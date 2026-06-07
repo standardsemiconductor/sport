@@ -3,24 +3,21 @@
 -- @
 -- import Sport
 --
--- main = withSport $ \\s -> do
+-- main = do
+--   s <- newSportIO
 --   openSport s defSportCfg{path="\/dev\/ttyUSB1", speed=B19200}
 --   bs <- readSport s 64
 --   writeSport s bs
 -- @
 module Sport
-  ( -- *** Handle & Daemon
+  ( -- *** Handle
     Sport
-  , withSport
-  , withOpenSport
   , newSportIO
   , newSport
-  , runSport
   , -- *** Open & Close
     openSport
   , isOpenSport
   , getSportCfg
-  , getOpenSportCfg
   , defSportCfg
   , SportCfg(..)
   , BufferMode(..)
