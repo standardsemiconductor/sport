@@ -98,14 +98,13 @@ defSportCfg =
 -- | Open the serial port. Throw 'SportAlreadyOpen' if the
 -- serial port was already opened.
 openSport :: Sport -> SportCfg -> IO ()
-openSport (Sport s) cfg' = do
+openSport s@(Sport state) cfg' = do
   res <- newEmptyTMVarIO
   atomically $ do
-    st <- readTVar s
-    case st of
-      Closed        -> writeTVar s $ Opening cfg' res
-      Opening cfg _ -> throwSTM $ SportAlreadyOpen $ path cfg
-      Open    cfg _ -> throwSTM $ SportAlreadyOpen $ path cfg
+    cfgM <- getSportCfg s
+    case cfgM of
+      Nothing  -> writeTVar state $ Opening cfg' res
+      Just cfg -> throwSTM $ SportAlreadyOpen $ path cfg
   atomically $ do
     result <- takeTMVar res
     case result of
