@@ -1,8 +1,10 @@
+-- | Internal high-level serial port
 module Sport.Sport
   ( Sport
   , newSportIO
   , newSport
   , withSport
+  , withOpenSport
   , runSport
   , openSport
   , isOpenSport
@@ -14,10 +16,12 @@ module Sport.Sport
   , readSport
   , readSomeSport
   , writeSport
+  , flushSport
   , SportException(..)
   , displaySportException
   ) where
 
+import Control.Applicative
 import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Exception
@@ -26,10 +30,12 @@ import qualified Data.ByteString as Strict
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BS
 import Data.Functor
+import Data.Maybe
 import qualified Sport.Serial as S
 import System.IO
 import System.Posix
 
+-- | Serial port handle
 newtype Sport = Sport (TVar State)
 
 -- | Acquire IO serial port
@@ -46,21 +52,20 @@ data State
   | Open SportCfg Handle
   deriving Eq
 
-isOpen :: State -> Bool
-isOpen Open{} = True
-isOpen _      = False
+readHandle :: Sport -> STM Handle
+readHandle (Sport s) = do
+  st <- readTVar s
+  case st of
+    Closed    -> retry
+    Opening{} -> retry
+    Open _ h  -> return h
 
 tryReadHandle :: Sport -> STM (Maybe Handle)
-tryReadHandle (Sport s) = do
-  st <- readTVar s
-  return $ case st of
-    Closed    -> Nothing
-    Opening{} -> Nothing
-    Open _ h  -> Just h
+tryReadHandle s = Just `fmap` readHandle s <|> pure Nothing
 
 -- | Check if serial port is open
 isOpenSport :: Sport -> STM Bool
-isOpenSport (Sport s) = isOpen <$> readTVar s
+isOpenSport s = isJust <$> tryReadHandle s
 
 -- | Handle and serial configuration
 data SportCfg = SportCfg
@@ -143,41 +148,47 @@ closeResponse :: TMVar (Either SomeException a) -> STM ()
 closeResponse res = void $ tryPutTMVar res $ Left $ toException SportClosed
 
 -- | Read n bytes from the serial port. If the serial port is
--- closed then throw 'SportClosed'. Block if the serial port is
--- busy handling a concurrent request or until all n bytes are available.
+-- closed then throw 'SportClosed'. Blocks until all n bytes
+-- are available.
 readSport :: Sport -> Int -> IO ByteString
-readSport s n = join $ atomically $ do
-  hM <- tryReadHandle s
-  case hM of
-    Nothing -> throwSTM SportClosed
-    Just  h -> return $ BS.hGet h n
+readSport s n = do
+  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  BS.hGet h n
 
 -- | Read up to n bytes from the serial port. If the serial port
--- is closed then throw 'SportClosed'. Block if the serial port
--- is busy handling a concurrent request or until some of
+-- is closed then throw 'SportClosed'. Blocks until some of
 -- the n bytes are available.
 readSomeSport :: Sport -> Int -> IO ByteString
-readSomeSport s n = join $ atomically $ do
-  hM <- tryReadHandle s
-  case hM of
-    Nothing -> throwSTM SportClosed
-    Just  h -> return $ BS.fromStrict <$> Strict.hGetSome h n
+readSomeSport s n = do
+  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  BS.fromStrict <$> Strict.hGetSome h n
 
 -- | Write bytes to the serial port. If the serial port
 -- is closed then throw 'SportClosed'. Block if the serial
 -- port is busy handling a concurrent request.
 writeSport :: Sport -> ByteString -> IO ()
-writeSport s bs = join $ atomically $ do
-  hM <- tryReadHandle s
-  case hM of
-    Nothing -> throwSTM SportClosed
-    Just  h -> return $ BS.hPut h bs
+writeSport s bs = do
+  h <- atomically $ readHandle s <|> throwSTM SportClosed
+  BS.hPut h bs
+
+-- | Flush the serial handle. Do nothing if closed.
+flushSport :: Sport -> IO ()
+flushSport s = do
+  hM <- atomically $ tryReadHandle s
+  mapM_ hFlush hM
 
 -- | Acquire a serial port and run the daemon.
 withSport :: (Sport -> IO a) -> IO a
 withSport k = do
   s <- newSportIO
   either id id <$> race (k s) (runSport s)
+
+-- | Construct the handle, run the daemon,
+-- and open the configured serial port. The serial port
+-- is closed on leaving scope.
+withOpenSport :: SportCfg -> (Sport -> IO a) -> IO a
+withOpenSport cfg k =
+  withSport $ \s -> bracket_ (openSport s cfg) (closeSport s) (k s)
 
 -- | Run the serial port daemon and process requests.
 runSport :: Sport -> IO a

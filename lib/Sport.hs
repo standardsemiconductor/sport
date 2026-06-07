@@ -12,6 +12,7 @@ module Sport
   ( -- *** Handle & Daemon
     Sport
   , withSport
+  , withOpenSport
   , newSportIO
   , newSport
   , runSport
@@ -31,6 +32,7 @@ module Sport
     readSport
   , readSomeSport
   , writeSport
+  , flushSport
   , -- *** Exception
     SportException(..)
   , displaySportException
