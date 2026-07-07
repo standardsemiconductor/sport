@@ -49,7 +49,6 @@ withSerial cfg = bracket (openSerial cfg) hClose
 openSerial :: SerialCfg -> IO Handle
 openSerial cfg =
   bracketOnError (openFd (path cfg) ReadWrite flags) closeFd $ \fd -> do
-    setFdOption fd NonBlockingRead False
     configAttrs fd cfg
     fdToHandle fd
   where
