@@ -1,5 +1,9 @@
 # Revision history for sport
 
+## 3.1.0.0 -- 7-25-2025
+
+* Fix exclusive flag, was not being set
+
 ## 3.0.0.0 -- 6-7-2026
 
 * Update `withSport`, add `withNewSport`
