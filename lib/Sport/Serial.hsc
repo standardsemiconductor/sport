@@ -1,3 +1,5 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+
 -- | Low-level serial IO
 module Sport.Serial
   ( withSerial
@@ -9,6 +11,9 @@ module Sport.Serial
   ) where
 
 import Control.Exception
+import Control.Monad
+import Foreign
+import Foreign.C
 import System.IO
 import System.Posix
 
@@ -49,6 +54,7 @@ withSerial cfg = bracket (openSerial cfg) hClose
 openSerial :: SerialCfg -> IO Handle
 openSerial cfg =
   bracketOnError (openFd (path cfg) ReadWrite flags) closeFd $ \fd -> do
+    when (excl cfg) $ setExcl fd
     configAttrs fd cfg
     fdToHandle fd
   where
@@ -101,3 +107,15 @@ withStopBits attrs Two = attrs `withMode`    TwoStopBits
 withReadTimeout :: TerminalAttributes -> Maybe Int -> TerminalAttributes
 withReadTimeout attrs Nothing  = attrs
 withReadTimeout attrs (Just t) = attrs `withTime` t
+
+setExcl :: Fd -> IO ()
+setExcl fd = ioctl fd #{const TIOCEXCL} nullPtr
+
+ioctl :: Fd -> Int -> Ptr d -> IO ()
+ioctl f req =
+  throwErrnoIfMinus1_ "ioctl"
+    . c_ioctl (fromIntegral f) (fromIntegral req)
+    . castPtr
+
+#include <sys/ioctl.h>
+foreign import ccall "ioctl" c_ioctl :: CInt -> CInt -> Ptr () -> IO  CInt
